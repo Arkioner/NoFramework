@@ -52,8 +52,10 @@ public class DIContainerTest {
 
     @Test
     void testDependencyInjectionWithNamedParameters() throws Exception {
-        container.registerInstance(new DependencyA(), "dependencyA");
-        container.registerInstance(new DependencyB(), "dependencyB");
+        DependencyA depA = new DependencyA();
+        DependencyB depB = new DependencyB();
+        container.registerInstance(depA, "dependencyA");
+        container.registerInstance(depB, "dependencyB");
         container.register(ComplexService.class);
         ComplexService service = container.resolve(ComplexService.class);
         assertNotNull(service);
@@ -66,8 +68,28 @@ public class DIContainerTest {
         assertTrue(depAField.get(service) instanceof DependencyA);
         assertTrue(depBField.get(service) instanceof DependencyB);
         // Verify singleton behavior
-        assertSame(depAField.get(service), container.resolve(DependencyA.class, "dependencyA"));
-        assertSame(depBField.get(service), container.resolve(DependencyB.class, "dependencyB"));
+        assertSame(depA, depAField.get(service));
+        assertSame(depB, depBField.get(service));
+        ComplexService service2 = container.resolve(ComplexService.class);
+        assertSame(service, service2);
+    }
+
+    @Test
+    void testDependencyInjectionWithRecord() throws Exception {
+        DependencyA depA = new DependencyA();
+        DependencyB depB = new DependencyB();
+        container.registerInstance(depA, "dependencyA");
+        container.registerInstance(depB, "dependencyB");
+        container.register(ComplexRecord.class);
+        ComplexRecord record = container.resolve(ComplexRecord.class);
+        assertNotNull(record);
+        assertTrue(record instanceof ComplexRecord);
+        // Verify dependencies using record components
+        assertSame(depA, record.dependencyA());
+        assertSame(depB, record.dependencyB());
+        // Verify singleton behavior
+        ComplexRecord record2 = container.resolve(ComplexRecord.class);
+        assertSame(record, record2);
     }
 
     @Test
@@ -150,6 +172,8 @@ public class DIContainerTest {
             this.dependencyB = dependencyB;
         }
     }
+
+    record ComplexRecord(DependencyA dependencyA, DependencyB dependencyB) {}
 
     static class CyclicA {
         public CyclicA(CyclicB cyclicB) {}

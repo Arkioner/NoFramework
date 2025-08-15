@@ -2,10 +2,7 @@ package com.arkioner.infrastructure;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class DIContainer {
     private static final String defaultBeanName = "bean";
@@ -40,11 +37,7 @@ public class DIContainer {
         String key = getKey(implementation, name);
         bindings.put(key, implementation);
 
-        for (Class<?> inheritedInterface : implementation.getInterfaces()) {
-            if (!inheritedInterface.getName().startsWith("java.") && !inheritedInterface.getName().startsWith("javax.")) {
-                interfaceMappings.put(getKey(inheritedInterface, name), implementation);
-            }
-        }
+        registerInterfaceMappings(implementation, name);
     }
 
     public <T> void registerInstance(T instance) {
@@ -59,20 +52,15 @@ public class DIContainer {
         String key = getKey(implementation, name);
         singletons.put(key, instance);
 
-        for (Class<?> inheritedInterface : implementation.getInterfaces()) {
-            if (!inheritedInterface.getName().startsWith("java.") && !inheritedInterface.getName().startsWith("javax.")) {
-                interfaceMappings.put(getKey(inheritedInterface, name), implementation);
-            }
-        }
+        registerInterfaceMappings(implementation, name);
     }
 
-    @SuppressWarnings("unchecked")
-    public <T> T resolve(Class<T> type) throws Exception {
+    public <T> T resolve(Class<T> type) {
         return resolve(type, defaultBeanName);
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T resolve(Class<T> type, String name) throws Exception {
+    public <T> T resolve(Class<T> type, String name) {
         if (type == null) {
             throw new IllegalArgumentException("Type cannot be null");
         }
@@ -108,32 +96,20 @@ public class DIContainer {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T createInstance(Class<?> implClass, String bindingName) throws Exception {
-        Constructor<?> selectedConstructor = null;
-        for (Constructor<?> constructor : implClass.getConstructors()) {
-            Class<?>[] paramTypes = constructor.getParameterTypes();
-            Parameter[] parameters = constructor.getParameters();
-            boolean canResolveAll = true;
-            for (int i = 0; i < paramTypes.length; i++) {
-                String paramName = parameters[i].getName();
-                String key = getKey(paramTypes[i], paramName);
-                String defaultKey = getDefaultKey(paramTypes[i].getName());
-                if (!bindings.containsKey(key) && !interfaceMappings.containsKey(key) && !singletons.containsKey(key) &&
-                        !bindings.containsKey(defaultKey) && !interfaceMappings.containsKey(defaultKey) && !singletons.containsKey(defaultKey)) {
-                    canResolveAll = false;
-                    break;
-                }
-            }
-            if (canResolveAll) {
-                selectedConstructor = constructor;
-                break;
-            }
-        }
+    private <T> T createInstance(Class<?> implClass, String bindingName) {
+        return getSuitableConstructor(implClass)
+                .map(constructor -> {
+                    Object[] dependencies = getDependencies(implClass, constructor);
+                    try {
+                        return (T) constructor.newInstance(dependencies);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .orElseThrow(() -> new IllegalStateException("No suitable constructor found for " + implClass.getName() + " with binding name " + bindingName));
+    }
 
-        if (selectedConstructor == null) {
-            throw new IllegalStateException("No suitable constructor found for " + implClass.getName() + " with binding name " + bindingName);
-        }
-
+    private Object[] getDependencies(Class<?> implClass, Constructor<?> selectedConstructor) {
         Class<?>[] paramTypes = selectedConstructor.getParameterTypes();
         Parameter[] parameters = selectedConstructor.getParameters();
         Object[] params = new Object[paramTypes.length];
@@ -154,7 +130,37 @@ public class DIContainer {
                 throw new IllegalStateException("Failed to resolve parameter " + paramName + " of type " + paramTypes[i].getName() + " for " + implClass.getName(), e);
             }
         }
+        return params;
+    }
 
-        return (T) selectedConstructor.newInstance(params);
+    private Optional<Constructor<?>> getSuitableConstructor(Class<?> implClass) {
+        for (Constructor<?> constructor : implClass.getDeclaredConstructors()) {
+            constructor.setAccessible(true);
+            Class<?>[] paramTypes = constructor.getParameterTypes();
+            Parameter[] parameters = constructor.getParameters();
+            boolean canResolveAll = true;
+            for (int i = 0; i < paramTypes.length; i++) {
+                String paramName = parameters[i].getName();
+                String key = getKey(paramTypes[i], paramName);
+                String defaultKey = getDefaultKey(paramTypes[i].getName());
+                if (!bindings.containsKey(key) && !interfaceMappings.containsKey(key) && !singletons.containsKey(key) &&
+                        !bindings.containsKey(defaultKey) && !interfaceMappings.containsKey(defaultKey) && !singletons.containsKey(defaultKey)) {
+                    canResolveAll = false;
+                    break;
+                }
+            }
+            if (canResolveAll) {
+                return Optional.of(constructor);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private <T> void registerInterfaceMappings(Class<T> implementation, String name) {
+        for (Class<?> inheritedInterface : implementation.getInterfaces()) {
+            if (!inheritedInterface.getName().startsWith("java.") && !inheritedInterface.getName().startsWith("javax.")) {
+                interfaceMappings.put(getKey(inheritedInterface, name), implementation);
+            }
+        }
     }
 }
