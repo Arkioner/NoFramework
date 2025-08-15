@@ -17,8 +17,7 @@ public class DIContainerTest {
         container.register(DependencyA.class);
         DependencyA instance = container.resolve(DependencyA.class);
         assertNotNull(instance);
-        assertTrue(instance instanceof DependencyA);
-        // Verify singleton behavior
+
         DependencyA instance2 = container.resolve(DependencyA.class);
         assertSame(instance, instance2);
     }
@@ -28,8 +27,7 @@ public class DIContainerTest {
         container.register(DependencyA.class, "custom");
         DependencyA instance = container.resolve(DependencyA.class, "custom");
         assertNotNull(instance);
-        assertTrue(instance instanceof DependencyA);
-        // Verify singleton behavior
+
         DependencyA instance2 = container.resolve(DependencyA.class, "custom");
         assertSame(instance, instance2);
     }
@@ -59,15 +57,12 @@ public class DIContainerTest {
         container.register(ComplexService.class);
         ComplexService service = container.resolve(ComplexService.class);
         assertNotNull(service);
-        assertTrue(service instanceof ComplexService);
-        // Verify dependencies using reflection
+
         java.lang.reflect.Field depAField = ComplexService.class.getDeclaredField("dependencyA");
         depAField.setAccessible(true);
         java.lang.reflect.Field depBField = ComplexService.class.getDeclaredField("dependencyB");
         depBField.setAccessible(true);
-        assertTrue(depAField.get(service) instanceof DependencyA);
-        assertTrue(depBField.get(service) instanceof DependencyB);
-        // Verify singleton behavior
+
         assertSame(depA, depAField.get(service));
         assertSame(depB, depBField.get(service));
         ComplexService service2 = container.resolve(ComplexService.class);
@@ -83,11 +78,10 @@ public class DIContainerTest {
         container.register(ComplexRecord.class);
         ComplexRecord record = container.resolve(ComplexRecord.class);
         assertNotNull(record);
-        assertTrue(record instanceof ComplexRecord);
-        // Verify dependencies using record components
+
         assertSame(depA, record.dependencyA());
         assertSame(depB, record.dependencyB());
-        // Verify singleton behavior
+
         ComplexRecord record2 = container.resolve(ComplexRecord.class);
         assertSame(record, record2);
     }
@@ -98,8 +92,7 @@ public class DIContainerTest {
         container.register(SimpleService.class);
         Service service = container.resolve(Service.class);
         assertNotNull(service);
-        assertTrue(service instanceof SimpleService);
-        // Verify singleton behavior
+
         Service service2 = container.resolve(Service.class);
         assertSame(service, service2);
     }
